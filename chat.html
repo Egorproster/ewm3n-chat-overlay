@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>TNS Twitch Chat Overlay</title>
+  <script src="https://cdn.jsdelivr.net/npm/tmi.js@latest"></script> <!-- Библиотека tmi.js для IRC -->
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      font-family: "Arial", sans-serif; /* Кастомизация: меняй шрифт */
+      color: #ffffff; /* Цвет текста по умолчанию */
+    }
+
+    #chat-container {
+      position: relative;
+      width: 400px; /* Кастомизация: ширина чата */
+      height: 600px; /* Кастомизация: высота чата */
+      overflow-y: auto; /* Скролл, если сообщений много */
+      display: flex;
+      flex-direction: column-reverse; /* Чат снизу вверх */
+    }
+
+    #chat-frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+    }
+
+    /* Рамка под стиль твоей картинки */
+    #overlay-frame {
+      position: absolute;
+      inset: 0;
+      border: 4px solid transparent;
+      border-right: 6px solid #7c00ff;
+      border-image: linear-gradient(to bottom, #7c00ff, #1f0036) 1;
+      border-radius: 10px;
+      pointer-events: none;
+      box-shadow: 0 0 20px rgba(124, 0, 255, 0.4);
+    }
+
+    /* Подпись TNS */
+    #overlay-frame::after {
+      content: "TNS";
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      color: #e6e6ff;
+      font-family: "Orbitron", sans-serif; /* Нужно добавить шрифт в <head> если используешь */
+      font-size: 20px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 8px rgba(124, 0, 255, 0.8);
+    }
+
+    /* Стили для сообщений (кастомизация здесь) */
+    ul {
+      list-style: none;
+      padding: 10px;
+      margin: 0;
+    }
+
+    li {
+      background: rgba(0, 0, 0, 0.5); /* Полупрозрачный фон */
+      padding: 8px;
+      margin-bottom: 5px;
+      border-radius: 5px;
+      animation: fadeIn 0.3s ease-in; /* Анимация появления */
+      opacity: 0.8; /* Старые сообщения тускнеют */
+    }
+
+    li:last-child {
+      opacity: 1; /* Новое сообщение яркое */
+    }
+
+    .user {
+      color: #ff0000; /* Цвет ника (красный, как в твоём скрине) */
+      font-weight: bold;
+    }
+
+    .message {
+      color: #ffffff; /* Цвет сообщения */
+    }
+
+    .message img {
+      width: 28px; /* Размер эмотов */
+      height: 28px;
+      vertical-align: middle;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Скрываем скроллбар */
+    #chat-container::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet"> <!-- Шрифт для TNS -->
+</head>
+<body>
+  <div id="chat-container">
+    <ul id="chat-messages"></ul> <!-- Здесь будут сообщения -->
+    <div id="overlay-frame"></div>
+  </div>
+
+  <script>
+    // Функция для замены эмотов на изображения (из tmi.js гайда)
+    function getMessageHTML(message, emotes) {
+      if (!emotes) return message;
+      let stringReplacements = [];
+      Object.entries(emotes).forEach(([id, positions]) => {
+        const position = positions[0];
+        const [start, end] = position.split("-");
+        const stringToReplace = message.substring(parseInt(start, 10), parseInt(end, 10) + 1);
+        stringReplacements.push({
+          stringToReplace: stringToReplace,
+          replacement: `<img src="https://static-cdn.jtvnw.net/emoticons/v1/${id}/1.0" alt="${stringToReplace}">`,
+        });
+      });
+      return stringReplacements.reduce((acc, { stringToReplace, replacement }) => {
+        return acc.split(stringToReplace).join(replacement);
+      }, message);
+    }
+
+    // Подключение к Twitch IRC
+    const client = new tmi.client({
+      channels: ['ewm3n'], // Замени на свой канал, напр. 'ewm3n'
+      connection: { reconnect: true, secure: true }
+    });
+
+    client.connect();
+
+    client.on('message', (channel, tags, message, self) => {
+      const chat = document.getElementById('chat-messages');
+      const li = document.createElement('li');
+      const userSpan = document.createElement('span');
+      userSpan.classList.add('user');
+      userSpan.innerText = tags['display-name'] || tags.username;
+      const messageSpan = document.createElement('span');
+      messageSpan.classList.add('message');
+      messageSpan.innerHTML = ': ' + getMessageHTML(message, tags.emotes); // С эмотами
+      li.appendChild(userSpan);
+      li.appendChild(messageSpan);
+      chat.appendChild(li);
+
+      // Удаляем старые сообщения (чтобы не переполнялось, кастомизация: меняй на 30)
+      if (chat.children.length > 20) {
+        chat.removeChild(chat.children[0]);
+      }
+    });
+
+    // Опционально: Анимации и роли (для модов/сабов)
+    // Если tags.mod, добавь класс 'mod' к li и стиль в CSS: .mod { color: green; }
+  </script>
+</body>
+</html>
